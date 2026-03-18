@@ -210,4 +210,35 @@ soit ~19% d'erreur relative.
 
 ---
 
+##  Dashboard & Déploiement
 
+### Lancer le dashboard Streamlit
+```bash
+cd scripts/dashboard
+pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+Ouvre **http://localhost:8501**
+
+### Fonctionnalités du dashboard
+
+| Onglet | Description |
+|---|---|
+| **Dashboard** | KPIs, distribution DPE, zones climatiques, réel vs prédit, top communes |
+| **Simulateur** | Calcul des économies et ROI d'une rénovation énergétique |
+| **Modèle ML** | Comparaison RF vs GBT, importance des variables, pipeline complet |
+
+##  Aperçu du dashboard
+
+### Dashboard — Vue d'ensemble
+![Dashboard DPE](assets/1a.png)
+
+### Dashboard — Graphiques d'analyse
+![Graphiques](assets/2a.png)
+
+### Simulateur de rénovation énergétique
+![Simulateur 1](assets/3a.png)
+
+### Simulateur — Résultats et économies
+![Simulateur 2](assets/4a.png)
