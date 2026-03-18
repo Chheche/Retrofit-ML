@@ -1,0 +1,14 @@
+
+jars/
+
+data/
+*.csv
+*.json
+*.parquet
+
+
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.log
