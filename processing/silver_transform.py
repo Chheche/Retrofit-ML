@@ -16,27 +16,27 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType, IntegerType
 import os
 
-MINIO_ENDPOINT  = os.getenv("MINIO_ENDPOINT",  "http://localhost:9000")
-MINIO_ACCESS    = os.getenv("MINIO_ACCESS",    "minioadmin")
-MINIO_SECRET    = os.getenv("MINIO_SECRET",    "minioadmin")
+MINIO_ENDPOINT  = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
+MINIO_ACCESS    = os.getenv("MINIO_ACCESS", "minioadmin")
+MINIO_SECRET    = os.getenv("MINIO_SECRET", "minioadmin")
 BUCKET          = "datalake"
 BRONZE_PATH     = f"s3a://{BUCKET}/bronze/"
 SILVER_PATH     = f"s3a://{BUCKET}/silver/"
 
 
 COLONNES_CIBLES = [
-    "N_DPE",
-    "Date_reception_DPE",
-    "Etiquette_DPE",
-    "Etiquette_GES",
-    "Conso_5_usages_e_finale",
-    "Conso_5_usages_par_m2_e_finale",
-    "Surface_habitable_logement",
-    "Type_batiment",
-    "Periode_construction",
-    "Type_energie_principale_chauffage",
-    "Code_postal_ban",
-    "Emission_GES_5_usages_par_m2",
+    "numero_dpe",
+    "date_reception_dpe",
+    "etiquette_dpe",
+    "etiquette_ges",
+    "conso_5_usages_ef",
+    "conso_5_usages_par_m2_ef",
+    "surface_habitable_logement",
+    "type_batiment",
+    "periode_construction",
+    "type_energie_principale_chauffage",
+    "code_postal_ban",
+    "emission_GES_5_usages_par_m2",
 ]
 
 
