@@ -4,7 +4,7 @@
 
 Ce projet s'inscrit dans le cadre du challenge
 [Diagnostics de Performance Énergétique](https://defis.data.gouv.fr/defis/diagnostics-de-performance-energetique)
-proposé par **Enedis**.
+.
 
 Le projet est divisé en deux parties complémentaires :
 
