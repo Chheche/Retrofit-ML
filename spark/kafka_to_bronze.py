@@ -14,18 +14,23 @@ spark = (
     SparkSession.builder
     .appName("KafkaToBronze")
     .master("local[*]")
+    .config("spark.driver.host", "127.0.0.1")
+
+    # 👉 AJOUT IMPORTANT
     .config(
         "spark.jars.packages",
-        "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,"
-        "org.apache.hadoop:hadoop-aws:3.3.4,"
-        "com.amazonaws:aws-java-sdk-bundle:1.12.262"
+        "org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.8"
     )
+
+    # 👉 MinIO
     .config("spark.hadoop.fs.s3a.endpoint", "http://127.0.0.1:9000")
-    .config("spark.hadoop.fs.s3a.access.key", "admin")
-    .config("spark.hadoop.fs.s3a.secret.key", "password123")
+    .config("spark.hadoop.fs.s3a.access.key", "minioadmin")
+    .config("spark.hadoop.fs.s3a.secret.key", "minioadmin")
     .config("spark.hadoop.fs.s3a.path.style.access", "true")
     .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+
     .config("spark.sql.streaming.checkpointLocation", "s3a://data-lake/checkpoints")
+
     .getOrCreate()
 )
 
