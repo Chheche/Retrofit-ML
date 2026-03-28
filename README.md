@@ -27,7 +27,9 @@ Données brutes stockées sans transformation
 Format : Parquet
 Stockage : MinIO (S3 compatible)
 s3a://data-lake/bronze/
-6. 🥈 Silver Layer (Transformation)
+
+
+7. 🥈 Silver Layer (Transformation)
 Nettoyage des données
 Suppression des valeurs nulles
 Typage des colonnes
@@ -65,10 +67,74 @@ Création d’un dashboard interactif avec Streamlit
 
 spark/prepare_dashboard.py
 spark/dashboard_app.py
-⚙️ Technologies utilisées
-Apache Kafka → ingestion streaming
-Apache Spark → traitement distribué
-MinIO → stockage Data Lake
-Python → scripting
-Streamlit → visualisation
-MLlib → machine learning
+
+
+## ⚙️ Technologies utilisées
+
+- Apache Kafka → ingestion streaming  
+- Apache Spark → traitement distribué  
+- MinIO → stockage Data Lake  
+- Python → scripting  
+- Streamlit → visualisation  
+- MLlib → machine learning 
+
+
+## 🏗️ Architecture du Pipeline Big Data
+
+
+
+
+
+
+
+                ┌──────────────────────────┐
+                │      Data Sources        │
+                │  CSV (DPE / ENEDIS)     │
+                └─────────────┬────────────┘
+                              │
+                              ▼
+                ┌──────────────────────────┐
+                │     Kafka Producer       │
+                │   (producer.py - Python) │
+                └─────────────┬────────────┘
+                              │
+                              ▼
+                ┌──────────────────────────┐
+                │        Apache Kafka      │
+                │  Topics: dpe / enedis    │
+                └─────────────┬────────────┘
+                              │
+                              ▼
+                ┌──────────────────────────┐
+                │   Spark Structured       │
+                │      Streaming          │
+                │ (kafka_to_bronze.py)    │
+                └─────────────┬────────────┘
+                              │
+                              ▼
+        ┌──────────────────────────────────────────┐
+        │         🥉 Bronze Layer (MinIO)          │
+        │   Données brutes (Parquet - S3a)        │
+        └─────────────┬────────────────────────────┘
+                      │
+                      ▼
+        ┌──────────────────────────────────────────┐
+        │         🥈 Silver Layer                  │
+        │  Nettoyage + Jointure + Transformations │
+        │     (bronze_to_silver.py)              │
+        └─────────────┬────────────────────────────┘
+                      │
+                      ▼
+        ┌──────────────────────────────────────────┐
+        │         🥇 Gold Layer                    │
+        │     Agrégation & Analyse                │
+        │     (silver_to_gold.py)                │
+        └─────────────┬────────────────────────────┘
+                      │
+          ┌───────────┴────────────┐
+          ▼                        ▼
+ ┌──────────────────┐    ┌──────────────────────┐
+ │  Machine Learning│    │   Dashboard          │
+ │  train_model.py  │    │ Streamlit            │
+ │  (MLlib)         │    │ dashboard_app.py     │
+ └──────────────────┘    └──────────────────────┘
