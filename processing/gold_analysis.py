@@ -20,6 +20,7 @@ from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.ml import Pipeline
 import os
 
+# ── Configuration ──────────────────────────────────────────────────────────────
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
 MINIO_ACCESS   = os.getenv("MINIO_ACCESS",   "minioadmin")
 MINIO_SECRET   = os.getenv("MINIO_SECRET",   "minioadmin")
@@ -28,11 +29,12 @@ SILVER_PATH    = f"s3a://{BUCKET}/silver/"
 GOLD_PATH      = f"s3a://{BUCKET}/gold/"
 
 
+# ── Session Spark ──────────────────────────────────────────────────────────────
 def create_spark_session():
     return (
         SparkSession.builder
         .appName("DPE-Gold-ML")
-        .master("spark://localhost:7077")
+        .master("local[*]")
         .config("spark.jars.packages",
                 "org.apache.hadoop:hadoop-aws:3.3.4,"
                 "com.amazonaws:aws-java-sdk-bundle:1.12.262")
@@ -48,6 +50,7 @@ def create_spark_session():
     )
 
 
+# ── 1. Table des gains moyens par saut de classe ───────────────────────────────
 def compute_gain_table(df):
     """
     Calcule pour chaque classe DPE :
@@ -124,6 +127,7 @@ def compute_gain_matrix(df):
     return conso_map
 
 
+# ── 2. Modele ML — Regression Random Forest ───────────────────────────────────
 def train_model(df):
     """
     Objectif : predire la consommation kWh/m2/an d'un logement
@@ -226,6 +230,7 @@ def train_model(df):
     return model, rmse, r2
 
 
+# ── 3. Table finale pour le dashboard ─────────────────────────────────────────
 def build_dashboard_table(df, conso_map):
     """
     Cree une table agrégee prete pour Streamlit :
@@ -256,6 +261,7 @@ def build_dashboard_table(df, conso_map):
     print("Table dashboard sauvegardee dans gold/dashboard_gains/")
 
 
+# ── Main ───────────────────────────────────────────────────────────────────────
 def main():
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")

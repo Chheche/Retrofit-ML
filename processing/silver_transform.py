@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Etape 2 — Transformation Silver (Bronze -> Silver)
+Etape 2 - Transformation Silver (Bronze -> Silver)
 
 Lit les fichiers NDJSON depuis MinIO/bronze,
 nettoie et structure les donnees avec PySpark,
@@ -13,39 +13,37 @@ Usage :
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType, IntegerType
+from pyspark.sql.types import DoubleType
 import os
 
-MINIO_ENDPOINT  = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
-MINIO_ACCESS    = os.getenv("MINIO_ACCESS", "minioadmin")
-MINIO_SECRET    = os.getenv("MINIO_SECRET", "minioadmin")
-BUCKET          = "datalake"
-BRONZE_PATH     = f"s3a://{BUCKET}/bronze/"
-SILVER_PATH     = f"s3a://{BUCKET}/silver/"
+# Configuration
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
+MINIO_ACCESS   = os.getenv("MINIO_ACCESS",   "minioadmin")
+MINIO_SECRET   = os.getenv("MINIO_SECRET",   "minioadmin")
+BUCKET         = "datalake"
+BRONZE_PATH    = f"s3a://{BUCKET}/bronze/"
+SILVER_PATH    = f"s3a://{BUCKET}/silver/"
 
-
+# Colonnes exactes telles que retournees par l'API ADEME (verifiees dans l'EDA)
 COLONNES_CIBLES = [
-    "numero_dpe",
-    "date_reception_dpe",
     "etiquette_dpe",
     "etiquette_ges",
-    "conso_5_usages_ef",
-    "conso_5_usages_par_m2_ef",
     "surface_habitable_logement",
     "type_batiment",
     "periode_construction",
     "type_energie_principale_chauffage",
     "code_postal_ban",
-    "emission_GES_5_usages_par_m2",
+    "date_reception_dpe",
+    "conso_5_usages_par_m2_ef",
 ]
 
-
+# Spark Session
 def create_spark_session():
     print("Demarrage de la session Spark...")
     spark = (
         SparkSession.builder
         .appName("DPE-Silver-Transform")
-        .master("spark://localhost:7077")
+        .master("local[*]")
         .config("spark.jars.packages",
                 "org.apache.hadoop:hadoop-aws:3.3.4,"
                 "com.amazonaws:aws-java-sdk-bundle:1.12.262")
@@ -64,88 +62,72 @@ def create_spark_session():
     return spark
 
 
+# Lecture Bronze
 def read_bronze(spark):
     print(f"Lecture des donnees bronze depuis {BRONZE_PATH}...")
-    df = spark.read.json(BRONZE_PATH + "*/*/*.json")
-    print(f"  Lignes lues : {df.count()}")
-    print(f"  Colonnes    : {len(df.columns)}")
+    df = spark.read.json(BRONZE_PATH + "*/*.json")
+    print(f"  Lignes lues  : {df.count()}")
+    print(f"  Colonnes     : {len(df.columns)}")
+    print(f"  Apercu colonnes : {df.columns[:10]}")
     return df
 
 
-RENAME_MAP = {
-    "N°DPE":                               "N_DPE",
-    "Date_réception_DPE":                  "Date_reception_DPE",
-    "Etiquette_DPE":                       "Etiquette_DPE",
-    "Etiquette_GES":                       "Etiquette_GES",
-    "Conso_5_usages_é_finale":             "Conso_5_usages_e_finale",
-    "Conso_5_usages_par_m²_é_finale":      "Conso_5_usages_par_m2_e_finale",
-    "Surface_habitable_logement":          "Surface_habitable_logement",
-    "Type_bâtiment":                       "Type_batiment",
-    "Période_construction":                "Periode_construction",
-    "Type_énergie_principale_chauffage":   "Type_energie_principale_chauffage",
-    "Code_postal_ban":                     "Code_postal_ban",
-    "Emission_GES_5_usages_par_m²":        "Emission_GES_5_usages_par_m2",
-}
-
-
-def rename_columns(df):
-    for old, new in RENAME_MAP.items():
-        if old in df.columns:
-            df = df.withColumnRenamed(old, new)
-    return df
-
-
+# Nettoyage
 def clean(df):
-    print("Nettoyage des donnees...")
+    print("\nNettoyage des donnees...")
 
-    df = rename_columns(df)
-
+    # Garder uniquement les colonnes utiles presentes dans le df
     cols_presentes = [c for c in COLONNES_CIBLES if c in df.columns]
+    cols_manquantes = [c for c in COLONNES_CIBLES if c not in df.columns]
+    print(f"  Colonnes trouvees  : {cols_presentes}")
+    if cols_manquantes:
+        print(f"  Colonnes absentes  : {cols_manquantes}")
     df = df.select(cols_presentes)
 
     before = df.count()
 
-    if "N_DPE" in df.columns:
-        df = df.dropDuplicates(["N_DPE"])
-
-    numeric_cols = [
-        "Conso_5_usages_e_finale",
-        "Conso_5_usages_par_m2_e_finale",
-        "Surface_habitable_logement",
-        "Emission_GES_5_usages_par_m2",
-    ]
+    # Cast des colonnes numeriques
+    numeric_cols = ["conso_5_usages_par_m2_ef", "surface_habitable_logement"]
     for col in numeric_cols:
         if col in df.columns:
             df = df.withColumn(col, F.col(col).cast(DoubleType()))
 
-    df = df.filter(
-        F.col("Etiquette_DPE").isNotNull() &
-        F.col("Conso_5_usages_e_finale").isNotNull() &
-        F.col("Conso_5_usages_par_m2_e_finale").isNotNull() &
-        F.col("Surface_habitable_logement").isNotNull()
-    )
+    # Supprimer les lignes sans etiquette DPE ou sans consommation
+    filters = F.col("etiquette_dpe").isNotNull()
+    if "conso_5_usages_par_m2_ef" in df.columns:
+        filters = filters & F.col("conso_5_usages_par_m2_ef").isNotNull()
+    if "surface_habitable_logement" in df.columns:
+        filters = filters & F.col("surface_habitable_logement").isNotNull()
+    df = df.filter(filters)
 
-    df = df.filter(F.col("Etiquette_DPE").isin(["A", "B", "C", "D", "E", "F", "G"]))
+    # Garder uniquement les etiquettes valides A B C D E F G
+    df = df.filter(F.col("etiquette_dpe").isin(["A", "B", "C", "D", "E", "F", "G"]))
 
-    df = df.filter(
-        (F.col("Conso_5_usages_par_m2_e_finale") >= 0) &
-        (F.col("Conso_5_usages_par_m2_e_finale") <= 2000) &   # max raisonnable kWh/m2
-        (F.col("Surface_habitable_logement") >= 9) &           # min 9m2
-        (F.col("Surface_habitable_logement") <= 1000)          # max 1000m2
-    )
+    # Filtrer les valeurs aberrantes
+    if "conso_5_usages_par_m2_ef" in df.columns:
+        df = df.filter(
+            (F.col("conso_5_usages_par_m2_ef") >= 0) &
+            (F.col("conso_5_usages_par_m2_ef") <= 2000)
+        )
+    if "surface_habitable_logement" in df.columns:
+        df = df.filter(
+            (F.col("surface_habitable_logement") >= 9) &
+            (F.col("surface_habitable_logement") <= 1000)
+        )
 
-    etiquette_map = {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6, "G": 7}
+    # Ajouter colonne numerique pour l'etiquette (utile pour ML)
     df = df.withColumn(
-        "Etiquette_DPE_num",
-        F.when(F.col("Etiquette_DPE") == "A", 1)
-         .when(F.col("Etiquette_DPE") == "B", 2)
-         .when(F.col("Etiquette_DPE") == "C", 3)
-         .when(F.col("Etiquette_DPE") == "D", 4)
-         .when(F.col("Etiquette_DPE") == "E", 5)
-         .when(F.col("Etiquette_DPE") == "F", 6)
-         .when(F.col("Etiquette_DPE") == "G", 7)
+        "etiquette_dpe_num",
+        F.when(F.col("etiquette_dpe") == "A", 1)
+         .when(F.col("etiquette_dpe") == "B", 2)
+         .when(F.col("etiquette_dpe") == "C", 3)
+         .when(F.col("etiquette_dpe") == "D", 4)
+         .when(F.col("etiquette_dpe") == "E", 5)
+         .when(F.col("etiquette_dpe") == "F", 6)
+         .when(F.col("etiquette_dpe") == "G", 7)
     )
 
+    # Ajouter colonne de date de traitement
     df = df.withColumn("_silver_timestamp", F.current_timestamp())
 
     after = df.count()
@@ -156,34 +138,34 @@ def clean(df):
     return df
 
 
+# Exploration rapide
 def explore(df):
-    print("\n--- Exploration ---")
-    print("Schema :")
+    print("\n--- Exploration Silver ---")
     df.printSchema()
 
     print("\nDistribution des etiquettes DPE :")
-    df.groupBy("Etiquette_DPE") \
-      .agg(
-          F.count("*").alias("nb"),
-          F.round(F.avg("Conso_5_usages_par_m2_e_finale"), 1).alias("conso_moy_kWh_m2")
-      ) \
-      .orderBy("Etiquette_DPE") \
-      .show()
+    agg_cols = [F.count("*").alias("nb")]
+    if "conso_5_usages_par_m2_ef" in df.columns:
+        agg_cols.append(
+            F.round(F.avg("conso_5_usages_par_m2_ef"), 1).alias("conso_moy_kWh_m2")
+        )
+    df.groupBy("etiquette_dpe").agg(*agg_cols).orderBy("etiquette_dpe").show()
 
-    print("Conso moyenne par type de batiment :")
-    if "Type_batiment" in df.columns:
-        df.groupBy("Type_batiment") \
-          .agg(F.round(F.avg("Conso_5_usages_par_m2_e_finale"), 1).alias("conso_moy")) \
+    if "type_batiment" in df.columns:
+        print("Conso moyenne par type de batiment :")
+        df.groupBy("type_batiment") \
+          .agg(F.round(F.avg("conso_5_usages_par_m2_ef"), 1).alias("conso_moy")) \
           .orderBy(F.desc("conso_moy")) \
           .show()
 
 
+# Ecriture Silver
 def write_silver(df):
     print(f"\nEcriture Silver dans {SILVER_PATH}...")
     (
         df.write
           .mode("overwrite")
-          .partitionBy("Etiquette_DPE")
+          .partitionBy("etiquette_dpe")
           .parquet(SILVER_PATH)
     )
     print("Silver ecrit avec succes !")
@@ -191,14 +173,13 @@ def write_silver(df):
     print(f"  Bucket : datalake/silver/")
 
 
+# Main
 def main():
     spark = create_spark_session()
-
     df_bronze = read_bronze(spark)
     df_silver = clean(df_bronze)
     explore(df_silver)
     write_silver(df_silver)
-
     spark.stop()
     print("\nTransformation Silver terminee !")
 
